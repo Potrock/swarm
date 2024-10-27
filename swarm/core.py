@@ -78,11 +78,15 @@ class Swarm:
                     value=json.dumps({"assistant": agent.name}),
                     agent=agent,
                 )
+            case list() as content_list:
+                # Handle multi-modal content list
+                if all(isinstance(item, dict) and "type" in item for item in content_list):
+                    return Result(value=content_list)
             case _:
                 try:
                     return Result(value=str(result))
                 except Exception as e:
-                    error_message = f"Failed to cast response to string: {result}. Make sure agent functions return a string or Result object. Error: {str(e)}"
+                    error_message = f"Failed to cast response to string: {result}. Make sure agent functions return a string, content list, or Result object. Error: {str(e)}"
                     debug_print(debug, error_message)
                     raise TypeError(error_message)
 
@@ -122,14 +126,28 @@ class Swarm:
             raw_result = function_map[name](**args)
 
             result: Result = self.handle_function_result(raw_result, debug)
-            partial_response.messages.append(
-                {
-                    "role": "tool",
-                    "tool_call_id": tool_call.id,
-                    "tool_name": name,
-                    "content": result.value,
-                }
-            )
+            
+            # Add the tool response
+            partial_response.messages.append({
+                "role": "tool",
+                "tool_call_id": tool_call.id,
+                "tool_name": name,
+                "content": result.value,
+            })
+
+            # If there's an image, add it as a user message
+            if result.image:
+                partial_response.messages.append({
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": result.value},
+                        {
+                            "type": "image_url",
+                            "image_url": {"url": f"data:image/png;base64,{result.image}"}
+                        }
+                    ]
+                })
+
             partial_response.context_variables.update(result.context_variables)
             if result.agent:
                 partial_response.agent = result.agent
