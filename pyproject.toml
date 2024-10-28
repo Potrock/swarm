@@ -11,7 +11,7 @@ readme = "README.md"
 license = "MIT"
 
 [tool.poetry.dependencies]
-python = "^3.12.5"
+python = "^3.12"
 numpy = "*"
 openai = ">=1.33.0"
 pytest = "*"
